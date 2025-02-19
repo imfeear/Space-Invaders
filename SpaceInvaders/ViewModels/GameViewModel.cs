@@ -1,5 +1,7 @@
-﻿using System.Collections.ObjectModel;
+﻿using System;
+using System.Collections.ObjectModel;
 using System.Linq;
+using System.Threading.Tasks;
 using SpaceInvaders.Models;
 
 namespace SpaceInvaders.ViewModels;
@@ -12,8 +14,10 @@ public class GameViewModel
     public GameState State { get; set; }
 
     private bool moveLeft, moveRight;
-    private double enemyDirection = 5; // Direção inicial dos inimigos
+    private double enemyDirection = 1; // Direção inicial dos inimigos
     private bool enemiesShouldDescend = false; // Marca se os inimigos devem descer
+    private int moveDownCounter = 0;
+    private Random random = new Random();
 
     public GameViewModel()
     {
@@ -27,42 +31,38 @@ public class GameViewModel
             IsGameOver = false
         };
 
-        // Teste: Atualizar o Score após 2 segundos
-        Task.Delay(2000).ContinueWith(_ =>
-        {
-            State.Score = 100;
-            State.Lives = 2;
-        });
         SpawnEnemies();
     }
 
     public void UpdateGame()
     {
-        // Atualiza movimentação do jogador
-        if (moveLeft && Player.X > 0)
+        if (moveLeft)
             Player.MoveLeft();
-        if (moveRight && Player.X < 760) // Limite da tela
+        if (moveRight)
             Player.MoveRight();
 
-        // Atualiza movimentação dos tiros
         foreach (var bullet in Bullets.ToList())
         {
-            bullet.Move(); // Atualiza a posição vertical do projétil
-
-            // Remove o projétil se sair da tela
+            bullet.Move();
             if (bullet.Y < 0 || bullet.Y > 600)
-            {
                 Bullets.Remove(bullet);
-            }
         }
 
-        // Atualiza movimentação dos inimigos
+        moveDownCounter++;
+        if (moveDownCounter % 120 == 0)
+        {
+            foreach (var enemy in Enemies)
+            {
+                enemy.Y += 10;
+            }
+            enemyDirection *= -1;
+        }
+
         foreach (var enemy in Enemies)
         {
             enemy.X += enemyDirection;
 
-            // Detecta bordas da tela
-            if (enemy.X < 0 || enemy.X > 760)
+            if (Enemies.Any(e => e.X <= 0) || Enemies.Any(e => e.X >= 760))
             {
                 enemiesShouldDescend = true;
                 break;
@@ -73,17 +73,14 @@ public class GameViewModel
         {
             foreach (var enemy in Enemies)
             {
-                enemy.Y += 20; // Move inimigos para baixo
+                enemy.Y += 20;
             }
-
-            enemyDirection *= -1; // Inverta a direção dos inimigos
+            enemyDirection *= -1;
             enemiesShouldDescend = false;
         }
 
-        // Verifica colisões
+        EnemyShoot();
         CheckCollisions();
-
-        // Verifica condições de fim de jogo
         CheckGameOver();
     }
 
@@ -94,14 +91,25 @@ public class GameViewModel
 
     public void PlayerShoot()
     {
-        var bullet = Player.Shoot();
+        var bullet = new Bullet(Player.X + 15, Player.Y - 10, -5);
         Bullets.Add(bullet);
+    }
+
+    private void EnemyShoot()
+    {
+        foreach (var enemy in Enemies)
+        {
+            if (random.NextDouble() < 0.001)
+            {
+                var bullet = new Bullet(enemy.X + 15, enemy.Y + 10, 5);
+                Bullets.Add(bullet);
+            }
+        }
     }
 
     private void SpawnEnemies()
     {
-        // Adiciona inimigos em uma grade
-        for (int row = 0; row < 1; row++)
+        for (int row = 0; row < 5; row++)
         {
             for (int col = 0; col < 11; col++)
             {
@@ -114,33 +122,65 @@ public class GameViewModel
     {
         foreach (var bullet in Bullets.ToList())
         {
-            foreach (var enemy in Enemies.ToList())
+            if (bullet.Speed < 0)
             {
-                // Verifica colisão entre projéteis e inimigos
-                if (bullet.X >= enemy.X && bullet.X <= enemy.X + 40 &&
-                    bullet.Y >= enemy.Y && bullet.Y <= enemy.Y + 40)
+                foreach (var enemy in Enemies.ToList())
                 {
-                    Enemies.Remove(enemy);
-                    Bullets.Remove(bullet);
-                    State.Score += 100; // Incrementa a pontuação
-                    break;
+                    if (bullet.X >= enemy.X && bullet.X <= enemy.X + 40 &&
+                        bullet.Y >= enemy.Y && bullet.Y <= enemy.Y + 40)
+                    {
+                        Enemies.Remove(enemy);
+                        Bullets.Remove(bullet);
+                        State.Score += 100;
+                        break;
+                    }
                 }
+            }
+            else
+            {
+                if (bullet.X >= Player.X && bullet.X <= Player.X + 40 &&
+                    bullet.Y >= Player.Y && bullet.Y <= Player.Y + 20)
+                {
+                    Bullets.Remove(bullet);
+                    State.Lives--;
+                    if (State.Lives <= 0)
+                    {
+                        State.IsGameOver = true;
+                    }
+                }
+            }
+        }
+
+        foreach (var enemy in Enemies)
+        {
+            if (enemy.X >= Player.X && enemy.X <= Player.X + 40 &&
+                enemy.Y >= Player.Y && enemy.Y <= Player.Y + 20)
+            {
+                State.IsGameOver = true;
+                break;
             }
         }
     }
 
     private void CheckGameOver()
     {
-        // Verifica se o jogador perdeu todas as vidas
         if (State.Lives <= 0)
         {
             State.IsGameOver = true;
         }
-
-        // Verifica se todos os inimigos foram destruídos
-        if (Enemies.Count == 0)
+        else if (!Enemies.Any()) // Se todos os inimigos forem derrotados
         {
-            State.IsGameOver = true;
+            State.Lives++; // Concede uma vida extra
+            RestartGame();
         }
+    }
+
+    public void RestartGame()
+    {
+        Player = new Player(400, 500);
+        State.IsGameOver = false;
+        Enemies.Clear();
+        Bullets.Clear();
+        SpawnEnemies();
     }
 }

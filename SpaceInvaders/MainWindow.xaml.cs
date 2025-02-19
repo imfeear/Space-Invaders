@@ -2,126 +2,96 @@
 using System.Linq;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
-using System.Windows.Threading;
 using SpaceInvaders.ViewModels;
 
-namespace SpaceInvaders;
-
+namespace SpaceInvaders
+{
     public partial class MainWindow : Window
     {
-        private GameViewModel _gameViewModel;
-        private DispatcherTimer _gameTimer;
-
+        private GameViewModel gameViewModel;
+        
         public MainWindow()
         {
             InitializeComponent();
-            _gameViewModel = new GameViewModel();
-            DataContext = _gameViewModel;
-
-
-            _gameTimer = new DispatcherTimer
-            {
-                Interval = TimeSpan.FromMilliseconds(20)
-            };
-            _gameTimer.Tick += GameLoop;
-            _gameTimer.Start();
+            gameViewModel = new GameViewModel();
+            DataContext = gameViewModel;
+            CompositionTarget.Rendering += GameLoop;
         }
 
         private void GameLoop(object sender, EventArgs e)
         {
-            _gameViewModel.UpdateGame(); // Atualiza o estado do jogo
-            UpdateUI(); // Atualiza a interface gráfica
+            if (!gameViewModel.State.IsGameOver)
+            {
+                gameViewModel.UpdateGame();
+                RenderGame();
+            }
         }
 
-        private void UpdateUI()
+        public void RenderGame()
         {
-            // Remove apenas os elementos dinâmicos do jogo (player, inimigos, projéteis)
-            var dynamicElements = GameCanvas.Children.OfType<UIElement>()
-                .Where(e => !(e is TextBlock)) // Não remove os TextBlock
-                .ToList();
+            GameCanvas.Children.Clear();
 
-            foreach (var element in dynamicElements)
+            // Renderiza o jogador
+            Image playerImage = new Image
             {
-                GameCanvas.Children.Remove(element);
-            }
-
-            // Redesenha os elementos dinâmicos
-            // Adiciona o jogador
-            Rectangle player = new Rectangle
-            {
+                Source = new BitmapImage(new Uri("https://cdn-icons-png.flaticon.com/512/706/706026.png")), // URL do jogador
                 Width = 40,
-                Height = 20,
-                Fill = System.Windows.Media.Brushes.Lime
+                Height = 40
             };
-            Canvas.SetTop(player, _gameViewModel.Player.Y);
-            Canvas.SetLeft(player, _gameViewModel.Player.X);
-            GameCanvas.Children.Add(player);
+            Canvas.SetLeft(playerImage, gameViewModel.Player.X);
+            Canvas.SetTop(playerImage, gameViewModel.Player.Y);
+            GameCanvas.Children.Add(playerImage);
 
-            // Adiciona os inimigos
-            foreach (var enemy in _gameViewModel.Enemies)
+            // Renderiza os inimigos
+            foreach (var enemy in gameViewModel.Enemies)
             {
-                Rectangle enemyRect = new Rectangle
+                Image enemyImage = new Image
                 {
+                    Source = new BitmapImage(new Uri("https://png.pngtree.com/png-vector/20220623/ourmid/pngtree-space-invaders-character-game-play-png-image_5289513.png")),
                     Width = 40,
-                    Height = 40,
-                    Fill = System.Windows.Media.Brushes.Red
+                    Height = 40
                 };
-                Canvas.SetTop(enemyRect, enemy.Y);
-                Canvas.SetLeft(enemyRect, enemy.X);
-                GameCanvas.Children.Add(enemyRect);
+                Canvas.SetLeft(enemyImage, enemy.X);
+                Canvas.SetTop(enemyImage, enemy.Y);
+                GameCanvas.Children.Add(enemyImage);
             }
 
-            // Adiciona os projéteis
-            foreach (var bullet in _gameViewModel.Bullets)
+            // Renderiza os tiros
+            foreach (var bullet in gameViewModel.Bullets)
             {
                 Rectangle bulletRect = new Rectangle
                 {
                     Width = 5,
                     Height = 15,
-                    Fill = System.Windows.Media.Brushes.White
+                    Fill = Brushes.LightSeaGreen
                 };
-                Canvas.SetTop(bulletRect, bullet.Y);
                 Canvas.SetLeft(bulletRect, bullet.X);
+                Canvas.SetTop(bulletRect, bullet.Y);
                 GameCanvas.Children.Add(bulletRect);
             }
-
-            // Exibe mensagem de fim de jogo, se necessário
-            if (_gameViewModel.State.IsGameOver)
-            {
-                _gameTimer.Stop();
-                MessageBox.Visibility = Visibility.Visible;
-                MessageBox.Text = _gameViewModel.Enemies.Count == 0 ? "VOCÊ VENCEU!" : "GAME OVER!";
-                RestartButton.Visibility = Visibility.Visible; // Exibe o botão de reinício
-            }
         }
-        
+
+        private void Window_KeyDown(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Left) gameViewModel.MovePlayerLeft();
+            if (e.Key == System.Windows.Input.Key.Right) gameViewModel.MovePlayerRight();
+            if (e.Key == System.Windows.Input.Key.Space) gameViewModel.PlayerShoot();
+        }
+
+        private void Window_KeyUp(object sender, System.Windows.Input.KeyEventArgs e)
+        {
+            if (e.Key == System.Windows.Input.Key.Left) gameViewModel.StopMovingLeft();
+            if (e.Key == System.Windows.Input.Key.Right) gameViewModel.StopMovingRight();
+        }
+
         private void RestartButton_Click(object sender, RoutedEventArgs e)
         {
-            // Reinicia o jogo criando uma nova instância de GameView
-            MainWindow newGame = new MainWindow();
-            newGame.Show();
-            this.Close(); // Fecha a janela atual
-        }
-
-
-
-        private void Window_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Left)
-                _gameViewModel.MovePlayerLeft();
-            if (e.Key == Key.Right)
-                _gameViewModel.MovePlayerRight();
-            if (e.Key == Key.Space)
-                _gameViewModel.PlayerShoot();
-        }
-
-        private void Window_KeyUp(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Left)
-                _gameViewModel.StopMovingLeft();
-            if (e.Key == Key.Right)
-                _gameViewModel.StopMovingRight();
+            gameViewModel.RestartGame();
+            MessageBox.Visibility = Visibility.Hidden;
+            RestartButton.Visibility = Visibility.Hidden;
         }
     }
+}
