@@ -1,7 +1,5 @@
 ﻿using System.ComponentModel;
 
-namespace SpaceInvaders.Models;
-
 public class GameState : INotifyPropertyChanged
 {
     private int _score;
@@ -14,7 +12,7 @@ public class GameState : INotifyPropertyChanged
         set
         {
             _score = value;
-            OnPropertyChanged(nameof(Score));
+            OnPropertyChanged(nameof(Score)); // Notifica a interface para atualizar
         }
     }
 
@@ -40,7 +38,7 @@ public class GameState : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler PropertyChanged;
 
-    protected void OnPropertyChanged(string propertyName)
+    protected virtual void OnPropertyChanged(string propertyName)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
     }

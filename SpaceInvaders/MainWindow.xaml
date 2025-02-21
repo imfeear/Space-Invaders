@@ -6,7 +6,8 @@
 
     <Grid>
         <!-- Camada do Canvas para o jogo -->
-        <Canvas Name="GameCanvas" Background="Black" />
+        <Canvas Name="GameCanvas" Background="Black" >
+        </Canvas>
 
         <!-- Score -->
         <StackPanel Orientation="Horizontal"
@@ -17,7 +18,7 @@
                        Foreground="White"
                        FontSize="20"
                        FontWeight="Bold" />
-            <TextBlock Foreground="White"
+            <TextBlock Foreground="DarkGreen"
                        FontSize="20"
                        FontWeight="Bold"
                        Text="{Binding State.Score}" />
@@ -49,16 +50,15 @@
                    TextAlignment="Center"
                    Width="400" 
                    />
+        
+        <StackPanel x:Name="EndGameOptionsPanel" VerticalAlignment="Center" HorizontalAlignment="Center" Visibility="Collapsed">
+            <TextBlock Text="Game Over!" FontSize="36" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" Margin="10"/>
+            <TextBlock Text="{Binding State.Score, StringFormat='Your Score: {0}'}" FontSize="24" Foreground="White" HorizontalAlignment="Center" Margin="10"/>
+            <Button Content="Continue Playing" FontSize="20" Width="200" Height="50" Margin="5" Click="ContinuePlayingButton_Click"/>
+            <Button Content="Back to Main Menu" FontSize="20" Width="200" Height="50" Margin="5" Click="BackToMenuButton_Click"/>
+            <Button Content="Exit" FontSize="20" Width="200" Height="50" Margin="5" Click="ExitButton_Click"/>
+        </StackPanel>
 
-        <!-- Botão para reiniciar -->
-        <Button x:Name="RestartButton"
-                Content="Reiniciar"
-                FontSize="20"
-                FontWeight="Bold"
-                HorizontalAlignment="Center"
-                VerticalAlignment="Center"
-                Visibility="Hidden"
-                Padding="10,5"
-                Click="RestartButton_Click" />
+        
     </Grid>
 </Window>

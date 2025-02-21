@@ -24,8 +24,5 @@ public class Player
         X += Speed;
     }
 
-    public Bullet Shoot()
-    {
-        return new Bullet(X + 20, Y - 10, -15);
-    }
+
 }

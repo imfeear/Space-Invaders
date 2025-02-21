@@ -1,0 +1,31 @@
+﻿<Window x:Class="SpaceInvaders.MainMenu"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Space Invaders - Menu" Height="600" Width="800">
+    <Grid>
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="Gray" Offset="0" />
+                <GradientStop Color="Black" Offset="1" />
+            </LinearGradientBrush>
+        </Grid.Background>
+        <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="30">
+            <!-- Título do Jogo -->
+            <TextBlock Text="SPACE" FontSize="90" FontWeight="Bold" Foreground="DarkGreen" HorizontalAlignment="Center"/>
+            <TextBlock Text="INVADERS" FontSize="60" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
+
+            <!-- Pontuação dos Inimigos -->
+            <StackPanel Orientation="Vertical" HorizontalAlignment="Center" Margin="10">
+                <TextBlock Text="👾 = 100 PTS" FontSize="24" FontWeight="Bold" Foreground="White"/>
+                <TextBlock Text="👽 = 1000 PTS" FontSize="24" FontWeight="Bold" Foreground="White" />
+                <TextBlock Text="🛸 = ??? PTS" FontSize="24" FontWeight="Bold" Foreground="Red"/>
+            </StackPanel>
+            
+            
+
+            <!-- Botões -->
+            <Button Content="PLAY" FontSize="28" FontWeight="Bold" Width="250" Height="60" Foreground="White" Background="Black" BorderBrush="White" BorderThickness="2" Click="StartGameButton_Click" VerticalContentAlignment="Center" Margin="10" HorizontalContentAlignment="Center"/>
+            <Button Content="LEADERBOARD" FontSize="28" FontWeight="Bold" Width="250" Height="60" Foreground="White" Background="Black" BorderBrush="White" BorderThickness="2" Click="ScoreboardButton_Click" VerticalContentAlignment="Center" Margin="10" HorizontalContentAlignment="Center"/>
+        </StackPanel>
+    </Grid>
+</Window>

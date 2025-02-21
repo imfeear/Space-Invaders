@@ -4,17 +4,22 @@ public class Bullet
 {
     public double X { get; set; }
     public double Y { get; set; }
-    public double Speed { get; set; } // Velocidade do projétil
+    public double SpeedX { get; set; }
+    public double SpeedY { get; set; }
+    public bool IsPlayerBullet { get; set; }
 
-    public Bullet(double x, double y, double speed)
+    public Bullet(double x, double y, double speed, bool isPlayerBullet)
     {
         X = x;
         Y = y;
-        Speed = speed; // Defina a velocidade ao criar o projétil
+        SpeedX = 0;  // Não há movimento horizontal para o tiro do jogador
+        SpeedY = speed;  // Inicializando SpeedY com a mesma velocidade
+        IsPlayerBullet = isPlayerBullet;
     }
 
     public void Move()
     {
-        Y += Speed; // Atualiza a posição vertical do projétil
+        X += SpeedX;  // Move o tiro horizontalmente
+        Y += SpeedY;  // Move o tiro verticalmente
     }
 }
