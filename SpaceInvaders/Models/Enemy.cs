@@ -173,4 +173,154 @@ public class Boss : Enemy
 
 
 
+public class SupremeBoss : Boss
+{
+    private int specialAttackCooldown;
+    private int teleportCooldown;
+    private int meteorCooldown;
+    private int initialHealth;
+    private Random random = new Random();
+
+    public SupremeBoss(double x, double y, int difficultyLevel) : base(x, y)
+    {
+        initialHealth = 50 + (difficultyLevel * 20);
+        Health = initialHealth;  // Vida inicial do Boss Supremo
+        BossDamage = 5 + difficultyLevel;
+        BossShield = 20 + (difficultyLevel * 5);
+        AttackMode = "Frenzy";
+        Speed = 2.0 + (difficultyLevel * 0.3);
+
+        // Cooldowns iniciais
+        specialAttackCooldown = 300 - (difficultyLevel * 10);
+        teleportCooldown = 500;
+        meteorCooldown = 250 - (difficultyLevel * 10);
+
+        // Evita valores negativos nos cooldowns
+        specialAttackCooldown = Math.Max(130, specialAttackCooldown);
+        teleportCooldown = Math.Max(320, teleportCooldown);
+        meteorCooldown = Math.Max(100, meteorCooldown);
+    }
+
+    public void Attack(Player player)
+    {
+        player.Lives -= BossDamage;
+    }
+
+    public void Shoot(ObservableCollection<Bullet> bullets)
+    {
+        double healthPercentage = (double)Health / initialHealth;
+        double fireRate = 0.05 + (1 - healthPercentage) * 0.05; // Aumenta quando a vida cai
+
+        if (random.NextDouble() < fireRate)
+        {
+            var bullet = new Bullet(this.X + 30, this.Y + 60, 8 + Phase, false);
+            bullets.Add(bullet);
+        }
+    }
+
+    public void CircularAttack(ObservableCollection<Bullet> bullets)
+    {
+        double healthPercentage = (double)Health / initialHealth;
+
+        // Ajusta a frequência conforme a vida diminui
+        int attackFrequency = (int)(250 - (100 * (1 - healthPercentage)));
+
+        if (specialAttackCooldown <= 0)
+        {
+            int bulletCount = 30 + (int)((1 - healthPercentage) * 30); // Aumenta conforme perde vida
+            double angleStep = 360.0 / bulletCount;
+
+            for (int i = 0; i < bulletCount; i++)
+            {
+                double angle = i * angleStep;
+                double radian = Math.PI * angle / 180;
+                double bulletSpeedX = Math.Cos(radian) * (5 + Phase);
+                double bulletSpeedY = Math.Sin(radian) * (5 + Phase);
+
+                var bullet = new Bullet(this.X + 15, this.Y + 60, 0, false)
+                {
+                    SpeedX = bulletSpeedX,
+                    SpeedY = bulletSpeedY
+                };
+                bullets.Add(bullet);
+            }
+
+            specialAttackCooldown = Math.Max(80, attackFrequency); // Mantém um limite inferior
+        }
+    }
+
+    public void MeteorShower(ObservableCollection<Bullet> bullets)
+    {
+        double healthPercentage = (double)Health / initialHealth;
+        int meteorCount = 6 + (int)((1 - healthPercentage) * 6); // Mais meteoros com vida baixa
+
+        if (meteorCooldown <= 0)
+        {
+            for (int i = 0; i < meteorCount; i++)
+            {
+                double xPos = random.Next(50, 750);
+                var bullet = new Bullet(xPos, this.Y + 60, 10 + Phase, false);
+                bullets.Add(bullet);
+            }
+            meteorCooldown = Math.Max(90, 200 - (int)((1 - healthPercentage) * 100));
+        }
+    }
+
+    public void Teleport()
+    {
+        double healthPercentage = (double)Health / initialHealth;
+
+        if (healthPercentage <= 0.8 && teleportCooldown <= 0) // Só começa a teleportar abaixo de 80% de vida
+        {
+            this.X = random.Next(100, 700);
+            this.Y = random.Next(50, 300);
+            Console.WriteLine($"⚡ Supreme Boss se teletransportou para {this.X}, {this.Y}!");
+
+            // Ajuste da frequência de teleporte conforme a vida diminui
+            if (healthPercentage > 0.5)
+                teleportCooldown = 350; // Frequência moderada entre 80% e 50% de vida
+            else if (healthPercentage > 0.2)
+                teleportCooldown = 250; // Frequência maior entre 50% e 20% de vida
+            else
+                teleportCooldown = 150; // Frequência alta abaixo de 20% de vida
+        }
+    }
+
+    public void UpdateBoss(ObservableCollection<Bullet> bullets)
+    {
+        // Atualiza cooldowns
+        if (specialAttackCooldown > 0) specialAttackCooldown--;
+        if (teleportCooldown > 0) teleportCooldown--;
+        if (meteorCooldown > 0) meteorCooldown--;
+
+        // Executa ataques conforme a fase e a vida
+        CircularAttack(bullets);
+        if (Phase >= 2) MeteorShower(bullets);
+
+        // Executa teleporte com maior frequência conforme perde vida
+        Teleport();
+
+        // Aumenta a velocidade a cada fase
+        Speed = 2.5 + (Phase * 0.4);
+    }
+
+    public void TakeDamage(int damage)
+    {
+        if (BossShield > 0)
+        {
+            int shieldDamage = Math.Min(damage, BossShield);
+            BossShield -= shieldDamage;
+            damage -= shieldDamage;
+        }
+        Health -= damage;
+    }
 }
+
+}
+
+
+
+
+
+
+

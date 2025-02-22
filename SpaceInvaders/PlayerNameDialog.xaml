@@ -3,10 +3,16 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="Enter Player Name" Height="200" Width="400">
     <Grid>
+        <Grid.Background>
+            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                <GradientStop Color="Black" Offset="0" />
+                
+            </LinearGradientBrush>
+        </Grid.Background>
         <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Margin="20">
-            <TextBlock Text="Enter Your Name" FontSize="18" FontWeight="Bold" Foreground="Black" HorizontalAlignment="Center"/>
+            <TextBlock Text="Enter Your Name" FontSize="18" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center"/>
             <TextBox x:Name="PlayerNameTextBox" Width="200" FontSize="24" HorizontalAlignment="Center" Margin="10" />
-            <Button Content="OK" FontSize="20" Width="100" Height="40" HorizontalAlignment="Center" Click="OkButton_Click"/>
+            <Button Content="OK" FontSize="20" Width="100" Height="40" BorderBrush="DarkBlue" HorizontalAlignment="Center" Click="OkButton_Click"/>
         </StackPanel>
     </Grid>
 </Window>

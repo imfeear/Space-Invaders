@@ -21,6 +21,26 @@
       <Content Include="Assets\inimigo1.png">
         <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       </Content>
+      <None Remove="Assets\supreme_boss.png" />
+      <Content Include="Assets\supreme_boss.png">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Assets\background_music.mp3" />
+      <Content Include="Assets\background_music.mp3">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Assets\shot_sound.mp3" />
+      <Content Include="Assets\shot_sound.mp3">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Content>
+      <None Remove="Assets\shot_sound.wav" />
+      <Resource Include="Assets\shot_sound.wav">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Resource>
+      <None Remove="Assets\background_music.wav" />
+      <Resource Include="Assets\background_music.wav">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      </Resource>
     </ItemGroup>
 
 </Project>

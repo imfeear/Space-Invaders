@@ -14,10 +14,13 @@ namespace SpaceInvaders
 {
     public partial class MainWindow : Window
     {
+        
+        private MediaPlayer backgroundMusicPlayer;
         private GameViewModel gameViewModel;
         private string playerName;
         private DispatcherTimer gameTimer;
         private bool isScoreSaved = false;
+        public static MainWindow Instance { get; private set; }
         
         public MainWindow(string playerName)
         {
@@ -25,7 +28,8 @@ namespace SpaceInvaders
             this.playerName = playerName;  // Armazena o nome do jogador
             gameViewModel = new GameViewModel();
             DataContext = gameViewModel;
-
+            Instance = this;
+            
             // Inicializa o timer do jogo para controlar a renderização
             gameTimer = new DispatcherTimer
             {
@@ -33,6 +37,11 @@ namespace SpaceInvaders
             };
             gameTimer.Tick += GameLoop;
             gameTimer.Start();
+            
+            backgroundMusicPlayer = new MediaPlayer();
+            backgroundMusicPlayer.Open(new Uri("pack://application:,,,/Assets/background_music.wav"));  // Caminho para o arquivo de música de fundo no formato WAV
+            backgroundMusicPlayer.MediaEnded += BackgroundMusicPlayer_MediaEnded;  // Para quando a música terminar
+            backgroundMusicPlayer.Play();  // Começa a tocar a música
         }
 
         private void GameLoop(object sender, EventArgs e)
@@ -67,7 +76,7 @@ namespace SpaceInvaders
         }
 
 
-        private void ShowEndGameOptions()
+        public void ShowEndGameOptions()
         {
             // Define o DataContext para o painel de fim de jogo
             EndGameOptionsPanel.DataContext = gameViewModel;  // Usando o DataContext do jogo
@@ -109,16 +118,31 @@ namespace SpaceInvaders
             
             foreach (var boss in gameViewModel.Bosses)
             {
+                string bossImagePath;
+    
+                // Verifica se o boss atual é do tipo SupremeBoss
+                if (boss is SupremeBoss)
+                {
+                    bossImagePath = "pack://application:,,,/Assets/supreme_boss.png";
+                }
+                else
+                {
+                    bossImagePath = "pack://application:,,,/Assets/inimigo1.png";
+                }
+
                 Image bossImage = new Image
                 {
-                    Source = new BitmapImage(new Uri("pack://application:,,,/Assets/inimigo1.png")), // Aponte para o caminho correto da imagem do boss
-                    Width = 80, // Ajuste o tamanho conforme necessário
-                    Height = 80
+                    Source = new BitmapImage(new Uri(bossImagePath)),
+                    Width = boss is SupremeBoss ? 120 : 80,  // Aumenta o tamanho do Boss Supremo
+                    Height = boss is SupremeBoss ? 120 : 80
                 };
+
                 Canvas.SetLeft(bossImage, boss.X);
                 Canvas.SetTop(bossImage, boss.Y);
                 GameCanvas.Children.Add(bossImage);
             }
+
+
 
             // Renderiza os tiros
             foreach (var bullet in gameViewModel.Bullets)
@@ -156,6 +180,12 @@ namespace SpaceInvaders
             if (e.Key == System.Windows.Input.Key.Right) gameViewModel.MovePlayerRight();
             if (e.Key == System.Windows.Input.Key.Space) gameViewModel.PlayerShoot();
         }
+        
+        private void BackgroundMusicPlayer_MediaEnded(object sender, EventArgs e)
+        {
+            backgroundMusicPlayer.Position = TimeSpan.Zero;  // Volta o tempo para o início
+            backgroundMusicPlayer.Play();  // Reproduz a música novamente
+        }
 
         private void Window_KeyUp(object sender, System.Windows.Input.KeyEventArgs e)
         {
@@ -165,9 +195,20 @@ namespace SpaceInvaders
 
         private void ContinuePlayingButton_Click(object sender, RoutedEventArgs e)
         {
+            Console.WriteLine("Continuando o jogo...");  // Mensagem de log para depuração
             gameViewModel.RestartGame();  // Reinicia o jogo
-            EndGameOptionsPanel.Visibility = Visibility.Collapsed;  // Esconde as opções
+
+            // Limpa a tela de "Game Over"
+            EndGameOptionsPanel.Visibility = Visibility.Collapsed;  // Esconde as opções de fim de jogo
+    
+            // Reinicia o timer para garantir que o jogo continue
+            gameTimer.Start();  // Inicia novamente o ciclo de atualização do jogo
+
+            // Reinicia o ciclo de atualização imediatamente após o "Continuar"
+            gameViewModel.UpdateGame();  // Chama UpdateGame para garantir que o jogo seja atualizado imediatamente
         }
+
+
 
         private void BackToMenuButton_Click(object sender, RoutedEventArgs e)
         {
@@ -185,12 +226,21 @@ namespace SpaceInvaders
         private Brush GetShieldColor(int health)
         {
             // Dependendo da saúde da barricada, mudamos a cor
-            if (health == 3)
+            if (health == 7)
                 return Brushes.Purple; // Barricada intacta
+            else if (health == 6)
+                return Brushes.MediumPurple; // Barricada com um pouco de dano
+            else if (health == 5)
+                return Brushes.Violet; // Barricada com mais dano
+            else if (health == 4)
+                return Brushes.Plum; // Barricada com um pouco de dano
+            else if (health == 3)
+                return Brushes.PaleVioletRed; // Barricada com mais dano
             else if (health == 2)
                 return Brushes.Orange; // Barricada com um pouco de dano
             else if (health == 1)
                 return Brushes.Red; // Barricada com mais dano
+            
             else
                 return Brushes.Gray; // Barricada destruída
         }

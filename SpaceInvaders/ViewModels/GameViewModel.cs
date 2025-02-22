@@ -2,18 +2,37 @@
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Media;
 using SpaceInvaders.Models;
 
 namespace SpaceInvaders.ViewModels;
 
 public class GameViewModel
 {
+    private MediaPlayer shotSoundPlayer;
+
     public Player Player { get; set; }
     public ObservableCollection<Enemy> Enemies { get; set; }
     public ObservableCollection<Bullet> Bullets { get; set; }
     public GameState State { get; set; }
     
+    private double lastShootTime = 0; // Armazena o tempo do último disparo
+    private double shootCooldown = 0.2; // Intervalo de 0.5 segundos entre os tiros
+    private readonly double normalShootCooldown = 0.2;
+    private readonly double boostedShootCooldown = 0;
     
+    private DateTime bonusStartTime;  // Para armazenar o tempo de início do bônus
+    private bool isDoubleShootActive = false;  // Para verificar se o bônus de disparo duplo está ativo
+    private double doubleShootDuration = 4; // Duração do bônus de tiro duplo em segundos
+    private int nextDoubleShootThreshold = 2000;
+    
+    public bool supremeBossActive = false;
+    private bool supremeBossDefeated = true;
+    private int supremeBossDifficulty = 0;  // Nível de dificuldade do Boss Supremo
+    private int nextSupremeBossThreshold = 50000;  // Primeira aparição aos 50.000 pontos
+
+    private List<Enemy> savedEnemiesBeforeSupremeBoss = new List<Enemy>();
     
     public ObservableCollection<LeaderboardEntry> Leaderboard { get; set; }
     public ObservableCollection<Boss> Bosses { get; set; }
@@ -40,6 +59,15 @@ public class GameViewModel
             IsGameOver = false
         };
         
+        shotSoundPlayer = new MediaPlayer();
+        try
+        {
+            shotSoundPlayer.Open(new Uri("pack://application:,,,/Assets/shot_sound.wav"));  // Caminho para o som de disparo no formato WAV
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar o som: {ex.Message}");
+        }
         
         SpawnEnemies();
         SpawnShields();
@@ -50,6 +78,44 @@ public class GameViewModel
 
     public void UpdateGame()
     {
+        
+       
+        // Verificação de fim de jogo (quando as vidas são 0 ou menos)
+        if (State.Lives <= 0 && !State.IsGameOver)
+        {
+            State.IsGameOver = true;  // Marca o estado de "Game Over"
+
+            // Exibe o painel de "Game Over" na thread correta
+            Application.Current.Dispatcher.Invoke(new Action(() =>
+            {
+                MainWindow.Instance.ShowEndGameOptions();  // Chama o método que exibe o painel de Game Over
+            }));
+        }
+        Console.WriteLine($"🟢 Verificação do Supreme Boss - Score: {State.Score}, Próximo Boss: {nextSupremeBossThreshold}, Boss Ativo: {supremeBossActive}, Boss Derrotado: {supremeBossDefeated}");
+
+        // Ativa o bônus apenas ao atingir múltiplos de 2000 pontos
+        if (State.Score >= nextDoubleShootThreshold && !isDoubleShootActive)
+        {
+            ActivateDoubleShootBonus();
+            nextDoubleShootThreshold += 2000; // Define o próximo limiar para ativação
+        }
+
+        // Desativa o bônus após 10 segundos
+        if (isDoubleShootActive && (DateTime.Now - bonusStartTime).TotalSeconds >= doubleShootDuration)
+        {
+            Console.WriteLine("Desativando o bônus de tiro duplo!");
+            DeactivateDoubleShootBonus();
+        }
+        
+        if (State.Score >= nextSupremeBossThreshold && !supremeBossActive && supremeBossDefeated)
+        {
+            ActivateSupremeBoss();
+        }
+
+
+
+
+
         // Verifica se o jogador não ultrapassa a borda esquerda ou direita
         if (moveLeft && Player.X > 0)
             Player.MoveLeft();  // Só move se não ultrapassar a borda esquerda
@@ -96,30 +162,36 @@ public class GameViewModel
         foreach (var boss in Bosses.ToList())
         {
             boss.X += bossDirection;
-
-            // Verifica a fase do Boss e altera seu comportamento
             boss.CheckPhase();
 
-            // Se o boss atingir as bordas, muda a direção e desce
-            if (boss.X < 0 || boss.X > 800 - 60)
+            // Ajustando os limites de colisão conforme o tamanho do Supreme Boss
+            int bossWidth = boss is SupremeBoss ? 110 : 60;
+            int correctionOffset = 5; // Define o tamanho real do boss
+
+            if (boss.X <= 0 || (boss.X + bossWidth) >= (800 - correctionOffset))
             {
                 bossDirection *= -1;
-                boss.Y += 10;  // Faz o boss descer um pouco após atingir a borda
+                boss.Y += 10; // Move um pouco para baixo após atingir a borda
             }
 
-            // O Boss atira dependendo do seu modo de ataque
             if (boss.AttackMode == "Circular")
             {
-                boss.CircularAttack(Bullets);  // Ativa o ataque especial circular
+                boss.CircularAttack(Bullets);
             }
             else
             {
-                boss.Shoot(Bullets);  // Tiros normais (ou triplos)
+                boss.Shoot(Bullets);
             }
 
-            // O Boss ataca o jogador
             boss.Attack(Player);
+
+            if (boss is SupremeBoss supremeBoss)
+            {
+                supremeBoss.UpdateBoss(Bullets);
+            }
         }
+
+
 
 
 
@@ -138,11 +210,45 @@ public class GameViewModel
         CheckGameOver();
     }
 
-    private void SpawnBoss(double xPosition,double yPosition)
+    private void SpawnBoss(double xPosition, double yPosition)
     {
-        // Coloca o boss mais para cima (pode ajustar o valor conforme necessário)
-        Bosses.Add(new Boss(xPosition, yPosition));
+        if (!supremeBossActive) 
+        {
+            Console.WriteLine($"🟢 Criando boss normal em {xPosition}, {yPosition}");
+            Bosses.Add(new Boss(xPosition, yPosition));
+        }
     }
+
+    private void ActivateSupremeBoss()
+    {
+        Console.WriteLine($"⚠️ Boss Supremo apareceu! Dificuldade: {supremeBossDifficulty}");
+
+        supremeBossActive = true;
+        supremeBossDefeated = false; // O jogador precisa derrotá-lo primeiro!
+        supremeBossDifficulty++; // Ele fica mais difícil a cada aparição
+
+        // Atualiza para o próximo spawn em 50k pontos a mais
+        nextSupremeBossThreshold += 50000; 
+
+        // Salvar os inimigos antes do boss aparecer
+        savedEnemiesBeforeSupremeBoss = Enemies.ToList();
+
+        // 🔴 GARANTE QUE NÃO TEM BOSS NORMAL ATIVO!
+        Bosses.Clear();
+        Enemies.Clear();
+        
+        Shields.Clear(); // Remove as barricadas antigas
+        SpawnShields(); // Cria novas barricadas
+
+        // Criar o Boss Supremo no meio da tela
+        var supremeBoss = new SupremeBoss(350, 50, supremeBossDifficulty);
+        Bosses.Add(supremeBoss);
+
+        Console.WriteLine($"✅ Supreme Boss adicionado. Total de Bosses na lista: {Bosses.Count}");
+    }
+
+    
+
 
     public void MovePlayerLeft() => moveLeft = true;
     public void MovePlayerRight() => moveRight = true;
@@ -151,10 +257,50 @@ public class GameViewModel
 
     public void PlayerShoot()
     {
-        // Cria o tiro com a velocidade correta no eixo Y (para cima)
-        var bullet = new Bullet(Player.X + 15, Player.Y - 10, -9, true);  // Tiro do jogador se movendo para cima
-        Bullets.Add(bullet);
+        double currentTime = DateTime.Now.Ticks / TimeSpan.TicksPerSecond; // Tempo em segundos
+
+        if (currentTime - lastShootTime >= shootCooldown)
+        {
+            var bullet1 = new Bullet(Player.X + 15, Player.Y - 10, -20, true);
+            Bullets.Add(bullet1);
+
+            if (isDoubleShootActive)
+            {
+                var bullet2 = new Bullet(Player.X - 15, Player.Y - 10, -20, true); // Disparo do outro lado do jogador
+                Bullets.Add(bullet2);
+            }
+            
+            Application.Current.Dispatcher.Invoke(() => {
+                Console.WriteLine("Disparo! Reproduzindo som...");
+                shotSoundPlayer.Stop();  // Para o som se estiver tocando
+                shotSoundPlayer.Play();  // Toca o som
+                shotSoundPlayer.Volume = 1.0;
+            });
+
+            lastShootTime = currentTime; // Atualiza o tempo do último disparo
+        }
     }
+
+
+    
+    private void ActivateDoubleShootBonus()
+    {
+        isDoubleShootActive = true;
+        bonusStartTime = DateTime.Now;
+        shootCooldown = boostedShootCooldown;
+        Console.WriteLine("Bônus de tiro duplo ativado!");
+    }
+
+
+    
+    private void DeactivateDoubleShootBonus()
+    {
+        isDoubleShootActive = false;
+        shootCooldown = normalShootCooldown;
+        Console.WriteLine("Bônus de tiro duplo desativado!");
+    }
+
+
 
     
     private void EnemyShoot()
@@ -227,27 +373,72 @@ public void CheckCollisions()
                 }
             }
 
-            // Verifica colisão com o boss (somente os tiros do jogador)
+            // Verifica colisão com o boss (somente os tiros do jogador)// Verifica colisão com o boss (somente os tiros do jogador)
             foreach (var boss in Bosses.ToList())
             {
-                if (bullet.X >= boss.X && bullet.X <= boss.X + 60 &&
-                    bullet.Y >= boss.Y && bullet.Y <= boss.Y + 60)
+                if (bullet.X >= boss.X && bullet.X <= boss.X + 110 &&
+                    bullet.Y >= boss.Y && bullet.Y <= boss.Y + 70)
                 {
+                    Console.WriteLine($"🔥 Boss atingido! Vida antes: {boss.Health}");
+
                     boss.TakeDamage();  // Diminui a saúde do boss
 
-                    if (boss.Health <= 0)  // Se o boss morrer, remove-o da lista
+                    Console.WriteLine($"💥 Vida do boss agora: {boss.Health}");
+
+                    if (boss.Health <= 0)  // Se o boss morreu
                     {
-                        Bosses.Remove(boss);
-                        State.Score += 500;  // Aumenta a pontuação ao matar o boss
+                        Console.WriteLine($"❌ O Boss foi derrotado!");
+
+                        // Verifica se é um Supreme Boss antes de removê-lo
+                        if (boss is SupremeBoss)
+                        {
+                            Console.WriteLine($"👑 Supreme Boss foi derrotado!");
+                            supremeBossActive = false;
+                            supremeBossDefeated = true;
+                            State.Score += 10000; // Pontuação extra para o Supreme Boss
+                            Console.WriteLine($"✅ Atualizando SupremeBossDefeated para {supremeBossDefeated}");
+                        }
+                        else
+                        {
+                            State.Score += 1000; // Pontuação para bosses normais
+                        }
+
+                        Bosses.Remove(boss); // Só remove o boss depois de atualizar os estados
                     }
 
                     Bullets.Remove(bullet);  // Remove o tiro ao atingir o boss
                     break;  // Sai da verificação de colisão com o boss
                 }
             }
-        }
-        else // Tiros dos inimigos
-        {
+
+            
+            foreach (var boss in Bosses.ToList())
+            {
+                Console.WriteLine($"🔍 Checando vida do Boss Supremo: {boss.Health}");
+    
+                if (boss.Health <= 0)
+                {
+                    Console.WriteLine($"❌ Supreme Boss DERROTADO! Próximo boss pode spawnar. Atualizando supremeBossDefeated para TRUE.");
+        
+                    Bosses.Remove(boss);
+                    supremeBossActive = false;
+                    supremeBossDefeated = true;
+                    State.Score += 10000;
+
+                    Console.WriteLine($"✅ Boss Supremo derrotado! Ele voltará ao atingir {nextSupremeBossThreshold} pontos.");
+
+                    // Restaurar inimigos normais
+                    Enemies.Clear();
+                    foreach (var enemy in savedEnemiesBeforeSupremeBoss)
+                    {
+                        Enemies.Add(enemy);
+                    }
+                }
+            }
+
+
+            
+
             // Verifica colisão com as barricadas
             foreach (var shield in Shields.ToList())
             {
@@ -266,6 +457,10 @@ public void CheckCollisions()
                 }
             }
 
+        }
+        // Tiros dos inimigos
+        else
+        {
             // Verifica colisão com o jogador
             if (bullet.X >= Player.X && bullet.X <= Player.X + 40 &&
                 bullet.Y >= Player.Y && bullet.Y <= Player.Y + 20)
@@ -277,8 +472,27 @@ public void CheckCollisions()
                     State.IsGameOver = true;  // Se o jogador não tiver mais vidas, o jogo termina
                 }
             }
+
+            // Verifica colisão com as barricadas
+            foreach (var shield in Shields.ToList())
+            {
+                if (bullet.X >= shield.X && bullet.X <= shield.X + 40 &&
+                    bullet.Y >= shield.Y && bullet.Y <= shield.Y + 20)
+                {
+                    shield.TakeDamage();  // Diminui a saúde da barricada
+
+                    if (shield.Health <= 0)  // Se a barricada for destruída, remove-a
+                    {
+                        Shields.Remove(shield);
+                    }
+
+                    Bullets.Remove(bullet);  // Remove o tiro ao atingir a barricada
+                    break;  // Sai da verificação de colisão com barricadas
+                }
+            }
         }
     }
+
     // Verifica se algum inimigo tocou no player (colisão física)
     foreach (var enemy in Enemies.ToList())
     {
@@ -294,6 +508,8 @@ public void CheckCollisions()
         }
     }
 }
+
+
 
 
 
@@ -337,18 +553,17 @@ public void NextLevel()
     double bossYPosition = 10;
 
     // Criação de bosses com base na fase
-    if (State.Score >= 20000) // Fase 5
+    if (!supremeBossActive) 
     {
-        // Cria o primeiro boss
-        SpawnBoss(400,bossYPosition);  // Primeiro boss
-
-        // Cria o segundo boss um pouco ao lado do primeiro
-        double secondBossXPosition = 400 + 150;  // Desloca o segundo boss para a direita
-        SpawnBoss(secondBossXPosition, bossYPosition);  // Segundo boss posicionado ao lado
-    }
-    else if (State.Score >= 7000) // Fase 2, 3 e 4
-    {
-        SpawnBoss(400,bossYPosition); // Para as fases 2 a 4, cria apenas um boss
+        if (State.Score >= 20000) // Fase 5
+        {
+            SpawnBoss(400, bossYPosition);
+            SpawnBoss(550, bossYPosition);
+        }
+        else if (State.Score >= 7000) // Fase 2, 3 e 4
+        {
+            SpawnBoss(400, bossYPosition);
+        }
     }
 
     // Atualiza a dificuldade dos inimigos
@@ -377,20 +592,35 @@ public void NextLevel()
 
 
 
-
-
-
 public void RestartGame()
 {
+    // Resetando as variáveis do jogo
     Player = new Player(400, 500);
-    State.IsGameOver = false;
+    State.IsGameOver = false;  // Marca que o jogo não está mais em Game Over
+    State.Score = 0;  // Resetando a pontuação
+    State.Lives = 3;  // Reinicia as vidas
+
     Enemies.Clear();
     Bullets.Clear();
-    Bosses.Clear();  // Remove o boss da tela
+    Bosses.Clear();  // Limpa qualquer boss da tela
     Shields.Clear();  // Limpa as barricadas
 
+    // Reinicia o estado de bonus
+    supremeBossActive = false;
+    supremeBossDefeated = true;
+    nextSupremeBossThreshold = 50000;
+
+    // Inicializa o jogo com a fase 1
     SpawnEnemies();
     SpawnShields();  // Recria as barricadas do começo
+
+    // Restabelece o estado do jogo
+    nextDoubleShootThreshold = 2000;
+    shootCooldown = normalShootCooldown;
+
+    supremeBossActive = false;  // Resetando o estado do boss
+    supremeBossDefeated = true; // Marcando o boss como derrotado para iniciar o próximo
+    nextSupremeBossThreshold = 50000; // Resetando o limiar de pontos para o próximo Supremo Boss
 }
 
     
