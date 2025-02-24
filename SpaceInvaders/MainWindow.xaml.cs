@@ -9,6 +9,7 @@ using System.Windows.Shapes;
 using SpaceInvaders.ViewModels;
 using System.Windows.Threading;
 using SpaceInvaders.Models;
+using WpfAnimatedGif;
 
 namespace SpaceInvaders
 {
@@ -20,6 +21,10 @@ namespace SpaceInvaders
         private string playerName;
         private DispatcherTimer gameTimer;
         private bool isScoreSaved = false;
+        private MediaPlayer gameOverMusicPlayer;
+        private DispatcherTimer endGameTimer;  // Timer para controlar o tempo de espera até exibir o painel de Game Over
+
+
         public static MainWindow Instance { get; private set; }
         
         public MainWindow(string playerName)
@@ -37,12 +42,68 @@ namespace SpaceInvaders
             };
             gameTimer.Tick += GameLoop;
             gameTimer.Start();
+
             
             backgroundMusicPlayer = new MediaPlayer();
-            backgroundMusicPlayer.Open(new Uri("pack://application:,,,/Assets/background_music.wav"));  // Caminho para o arquivo de música de fundo no formato WAV
+            backgroundMusicPlayer.Open(new Uri("C:\\Users\\Bruno\\RiderProjects\\SpaceInvaders\\SpaceInvaders\\Assets\\background_music.wav"));  // Caminho para o arquivo de música de fundo no formato WAV
             backgroundMusicPlayer.MediaEnded += BackgroundMusicPlayer_MediaEnded;  // Para quando a música terminar
+            backgroundMusicPlayer.Volume = 0.6;
             backgroundMusicPlayer.Play();  // Começa a tocar a música
+            
+            gameOverMusicPlayer = new MediaPlayer();
+            gameOverMusicPlayer.Open(new Uri("C:\\Users\\Bruno\\RiderProjects\\SpaceInvaders\\SpaceInvaders\\Assets\\gameover.wav"));  // Caminho para o arquivo de música de Game Over no formato WAV
+            gameOverMusicPlayer.Volume = 0.6;  // Ajuste o volume conforme necessário
+
+            
         }
+        
+        public void ShowExplosionGif(double x, double y)
+        {
+            Console.WriteLine("Exibindo GIF de explosão...");
+
+            Image explosionImage = new Image
+            {
+                Width = 100,
+                Height = 100
+            };
+
+            // Certifique-se de que o caminho do GIF está correto
+            var gifSource = new BitmapImage(new Uri("pack://application:,,,/Assets/explosion.gif"));
+            ImageBehavior.SetAnimatedSource(explosionImage, gifSource);
+
+            Canvas.SetLeft(explosionImage, x);  // Posiciona o GIF horizontalmente
+            Canvas.SetTop(explosionImage, y);   // Posiciona o GIF verticalmente
+
+            // Verifique se o GameCanvas está acessível e visível
+            if (GameCanvas != null)
+            {
+                Console.WriteLine("GameCanvas encontrado. Adicionando o GIF.");
+                GameCanvas.Children.Add(explosionImage);  // Adiciona o GIF ao Canvas
+
+                // Configura um temporizador para remover o GIF após 1.5 segundos
+                var timer = new DispatcherTimer
+                {
+                    Interval = TimeSpan.FromSeconds(1) // Tempo que o GIF ficará visível
+                };
+
+                timer.Tick += (s, e) =>
+                {
+                    timer.Stop();
+                    Console.WriteLine("Removendo o GIF de explosão após 1.5 segundos.");
+                    GameCanvas.Children.Remove(explosionImage);  // Remove a animação após o tempo
+                };
+
+                timer.Start();
+            }
+            else
+            {
+                Console.WriteLine("GameCanvas não está acessível ou não foi inicializado.");
+            }
+        }
+
+
+        
+
 
         private void GameLoop(object sender, EventArgs e)
         {
@@ -78,10 +139,26 @@ namespace SpaceInvaders
 
         public void ShowEndGameOptions()
         {
-            // Define o DataContext para o painel de fim de jogo
-            EndGameOptionsPanel.DataContext = gameViewModel;  // Usando o DataContext do jogo
-            EndGameOptionsPanel.Visibility = Visibility.Visible;  // Exibe o painel com as opções
+            // Cria um temporizador para esperar 4 segundos antes de exibir o painel de fim de jogo
+            DispatcherTimer delayTimer = new DispatcherTimer
+            {
+                Interval = TimeSpan.FromSeconds(1)
+            };
+            delayTimer.Tick += (sender, args) =>
+            {
+                delayTimer.Stop();  // Para o timer após disparar
+
+                // Toca o som de Game Over e para a música de fundo
+                gameOverMusicPlayer.Play();
+                backgroundMusicPlayer.Stop();
+
+                // Define o DataContext e exibe o painel com as opções de fim de jogo
+                EndGameOptionsPanel.DataContext = gameViewModel;
+                EndGameOptionsPanel.Visibility = Visibility.Visible;
+            };
+            delayTimer.Start();
         }
+
 
 
 
@@ -183,9 +260,14 @@ namespace SpaceInvaders
         
         private void BackgroundMusicPlayer_MediaEnded(object sender, EventArgs e)
         {
-            backgroundMusicPlayer.Position = TimeSpan.Zero;  // Volta o tempo para o início
-            backgroundMusicPlayer.Play();  // Reproduz a música novamente
+            // Cheque se a música de fundo já foi parada, se sim, não reinicie
+            if (!gameViewModel.State.IsGameOver)
+            {
+                backgroundMusicPlayer.Position = TimeSpan.Zero;  // Volta o tempo para o início
+                backgroundMusicPlayer.Play();  // Reproduz a música novamente
+            }
         }
+
 
         private void Window_KeyUp(object sender, System.Windows.Input.KeyEventArgs e)
         {
@@ -195,6 +277,9 @@ namespace SpaceInvaders
 
         private void ContinuePlayingButton_Click(object sender, RoutedEventArgs e)
         {
+            backgroundMusicPlayer.Play();
+            gameOverMusicPlayer.Stop();  // Para a música de Game Over quando o jogo for reiniciado
+
             Console.WriteLine("Continuando o jogo...");  // Mensagem de log para depuração
             gameViewModel.RestartGame();  // Reinicia o jogo
 
@@ -215,6 +300,7 @@ namespace SpaceInvaders
             var mainMenuWindow = new MainMenu();  // Volta ao menu principal
             mainMenuWindow.Show();
             this.Close();  // Fecha a janela do jogo
+            backgroundMusicPlayer.Stop();
         }
 
         private void ExitButton_Click(object sender, RoutedEventArgs e)

@@ -6,7 +6,7 @@
 
     <Grid>
         <!-- Camada do Canvas para o jogo -->
-        <Canvas Name="GameCanvas" Background="Black" >
+        <Canvas Name="GameCanvas" Background="Black" HorizontalAlignment="Stretch" VerticalAlignment="Stretch" >
         </Canvas>
 
         <!-- Score -->

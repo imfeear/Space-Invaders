@@ -3,14 +3,23 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading.Tasks;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
+using System.Windows.Threading;
 using SpaceInvaders.Models;
+using WpfAnimatedGif;
+using System.Windows.Media.Imaging;
 
 namespace SpaceInvaders.ViewModels;
 
 public class GameViewModel
 {
     private MediaPlayer shotSoundPlayer;
+    private MainWindow _mainWindow;
+    private MediaPlayer explosionSoundPlayer;
+    private MediaPlayer supremeBossDefeatedSoundPlayer;
+
+
 
     public Player Player { get; set; }
     public ObservableCollection<Enemy> Enemies { get; set; }
@@ -47,6 +56,29 @@ public class GameViewModel
 
     public GameViewModel()
     {
+        explosionSoundPlayer = new MediaPlayer();
+        try
+        {
+            explosionSoundPlayer.Open(new Uri("C:\\Users\\Bruno\\RiderProjects\\SpaceInvaders\\SpaceInvaders\\Assets\\explosion_sound.wav"));  // Caminho para o som de explosão no formato WAV
+            explosionSoundPlayer.Volume = 0.6;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar o som de explosão: {ex.Message}");
+        }
+        
+        supremeBossDefeatedSoundPlayer = new MediaPlayer();
+        try
+        {
+            supremeBossDefeatedSoundPlayer.Open(new Uri("C:\\Users\\Bruno\\RiderProjects\\SpaceInvaders\\SpaceInvaders\\Assets\\supremeboss_killed.wav"));  // Caminho para o som de derrota do Boss Supremo no formato WAV
+            supremeBossDefeatedSoundPlayer.Volume = 0.6;
+        }
+        catch (Exception ex)
+        {
+            Console.WriteLine($"Erro ao carregar o som de derrota do Boss Supremo: {ex.Message}");
+        }
+
+        
         Player = new Player(400, 500);
         Enemies = new ObservableCollection<Enemy>();
         Bullets = new ObservableCollection<Bullet>();
@@ -62,7 +94,8 @@ public class GameViewModel
         shotSoundPlayer = new MediaPlayer();
         try
         {
-            shotSoundPlayer.Open(new Uri("pack://application:,,,/Assets/shot_sound.wav"));  // Caminho para o som de disparo no formato WAV
+            shotSoundPlayer.Open(new Uri("C:\\Users\\Bruno\\RiderProjects\\SpaceInvaders\\SpaceInvaders\\Assets\\shot_sound.wav"));  // Caminho para o som de disparo no formato WAV
+            shotSoundPlayer.Volume = 0.5;
         }
         catch (Exception ex)
         {
@@ -75,22 +108,21 @@ public class GameViewModel
         Leaderboard = new ObservableCollection<LeaderboardEntry>(LeaderboardManager.LeaderboardEntries);
         
     }
+    
+    private void PlayExplosionSound()
+    {
+        System.Diagnostics.Debug.WriteLine("Player morreu. Tocando som de explosão.");
+        explosionSoundPlayer.Position = TimeSpan.Zero;
+        explosionSoundPlayer.Play();
+    }
 
     public void UpdateGame()
     {
-        
-       
-        // Verificação de fim de jogo (quando as vidas são 0 ou menos)
         if (State.Lives <= 0 && !State.IsGameOver)
         {
-            State.IsGameOver = true;  // Marca o estado de "Game Over"
-
-            // Exibe o painel de "Game Over" na thread correta
-            Application.Current.Dispatcher.Invoke(new Action(() =>
-            {
-                MainWindow.Instance.ShowEndGameOptions();  // Chama o método que exibe o painel de Game Over
-            }));
+            State.IsGameOver = true;
         }
+
         Console.WriteLine($"🟢 Verificação do Supreme Boss - Score: {State.Score}, Próximo Boss: {nextSupremeBossThreshold}, Boss Ativo: {supremeBossActive}, Boss Derrotado: {supremeBossDefeated}");
 
         // Ativa o bônus apenas ao atingir múltiplos de 2000 pontos
@@ -111,9 +143,7 @@ public class GameViewModel
         {
             ActivateSupremeBoss();
         }
-
-
-
+        
 
 
         // Verifica se o jogador não ultrapassa a borda esquerda ou direita
@@ -397,6 +427,33 @@ public void CheckCollisions()
                             supremeBossDefeated = true;
                             State.Score += 10000; // Pontuação extra para o Supreme Boss
                             Console.WriteLine($"✅ Atualizando SupremeBossDefeated para {supremeBossDefeated}");
+                            
+                            Application.Current.Dispatcher.Invoke(() =>
+                            {
+                                supremeBossDefeatedSoundPlayer.Play();  // Toca o som de explosão
+                            });
+                            
+                            // Espera 2 segundos para continuar e voltar ao jogo normal
+                            Task.Delay(2000).ContinueWith(t =>
+                            {
+                                Application.Current.Dispatcher.Invoke(() =>
+                                {
+                                    // Reverte o jogo para o estado normal
+                                    Bosses.Remove(boss); // Remove o boss da lista
+                                    supremeBossActive = false;
+                                    supremeBossDefeated = true;
+                                    State.Score += 10000;
+
+                                    // Restaurar inimigos normais
+                                    Enemies.Clear();
+                                    foreach (var enemy in savedEnemiesBeforeSupremeBoss)
+                                    {
+                                        Enemies.Add(enemy);
+                                    }
+
+                                    // Aqui você pode adicionar mais lógica de reinicialização, se necessário
+                                });
+                            });
                         }
                         else
                         {
@@ -419,21 +476,36 @@ public void CheckCollisions()
                 if (boss.Health <= 0)
                 {
                     Console.WriteLine($"❌ Supreme Boss DERROTADO! Próximo boss pode spawnar. Atualizando supremeBossDefeated para TRUE.");
-        
-                    Bosses.Remove(boss);
-                    supremeBossActive = false;
-                    supremeBossDefeated = true;
-                    State.Score += 10000;
-
-                    Console.WriteLine($"✅ Boss Supremo derrotado! Ele voltará ao atingir {nextSupremeBossThreshold} pontos.");
-
-                    // Restaurar inimigos normais
-                    Enemies.Clear();
-                    foreach (var enemy in savedEnemiesBeforeSupremeBoss)
+                    
+                    // Toca o som de explosão do Boss Supremo
+                    Application.Current.Dispatcher.Invoke(() =>
                     {
-                        Enemies.Add(enemy);
-                    }
+                        supremeBossDefeatedSoundPlayer.Play();  // Toca o som de explosão
+                    });
+                    Task.Delay(2000).ContinueWith(t =>
+                    {
+                        Application.Current.Dispatcher.Invoke(() =>
+                        {
+                            // Remove o boss e continua o jogo normal
+                            Bosses.Remove(boss);
+                            supremeBossActive = false;
+                            supremeBossDefeated = true;
+                            State.Score += 10000;
+
+                            Console.WriteLine($"✅ Boss Supremo derrotado! Ele voltará ao atingir {nextSupremeBossThreshold} pontos.");
+
+                            // Restaurar inimigos normais
+                            Enemies.Clear();
+                            foreach (var enemy in savedEnemiesBeforeSupremeBoss)
+                            {
+                                Enemies.Add(enemy);
+                            }
+
+                            // Você pode restaurar mais elementos do jogo aqui, se necessário
+                        });
+                    });
                 }
+            
             }
 
 
@@ -510,17 +582,23 @@ public void CheckCollisions()
 }
 
 
-
-
-
-    
-
 private void CheckGameOver()
 {
     // Se o jogador perdeu todas as vidas
     if (State.Lives <= 0)
     {
+        // Acesse a instância singleton da MainWindow
+        if (MainWindow.Instance != null)
+        {
+            MainWindow.Instance.ShowExplosionGif(Player.X, Player.Y);
+        }
+        else
+        {
+            Console.WriteLine("A MainWindow não está acessível.");
+        }
         State.IsGameOver = true;
+        PlayExplosionSound();
+
     }
     // Se o jogador ganhou, ou seja, todos os inimigos e o boss foram derrotados
     else if (!Enemies.Any() && !Bosses.Any())
@@ -589,7 +667,6 @@ public void NextLevel()
         boss.ResetSpecialAttackCooldown();  // Reseta o cooldown do ataque especial do boss
     }
 }
-
 
 
 public void RestartGame()
