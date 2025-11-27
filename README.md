@@ -1,6 +1,6 @@
 # Space Invaders - Jogo em C# com WPF
 
-![Space Invaders](img/screen-example.png)
+![Space Invaders](\SpaceInvaders\img\screen-example.png)
 
 **Space Invaders** é uma implementação clássica do jogo de arcade "Space Invaders", criado usando a linguagem de programação C# e a framework WPF (Windows Presentation Foundation). O jogo oferece uma experiência divertida de destruição de inimigos, com vários desafios como a ativação de bônus e a batalha contra um Boss Supremo.
 
